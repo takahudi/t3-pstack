@@ -347,7 +347,7 @@ describe("--source", () => {
       stderr: "",
       source: "takahudi/t3-pstack",
     });
-    expect(parseSource("git@github.com:ChHoumann/t3-pstack.git", "/home/u").key).toBe(github.key);
+    expect(parseSource("git@github.com:TakaHudi/t3-pstack.git", "/home/u").key).toBe(github.key);
     expect(parseSource("https://github.com/takahudi/t3-pstack", "/home/u").key).toBe(github.key);
     expect(() => parseSource("./missing", cwd)).toThrow("--source ./missing: not owner/repo, a Git URL, or an existing directory");
   });

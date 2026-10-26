@@ -65,6 +65,11 @@ jobs:
         with:
           bun-version: "1.3.14"
           no-cache: true
+      - name: Fetch upstream
+        run: git fetch --no-tags "$UPSTREAM" +main:refs/remotes/upstream/main
+      # Drift on main is not a patch to redo: sync --repair would drop it.
+      - name: Verify main is upstreamSha plus the overlay
+        run: node tools/fork/fork.mjs verify
       # Writes sha, then tree and checks once upstream has moved, or
       # overlay=failed.
       - name: Build and check the sync commit
@@ -72,7 +77,6 @@ jobs:
         run: |
           set -uo pipefail
           log="$RUNNER_TEMP/sync.log"
-          git fetch --no-tags "$UPSTREAM" +main:refs/remotes/upstream/main || exit 1
           sha=$(git rev-parse refs/remotes/upstream/main)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           if ! commit=$(node tools/fork/fork.mjs sync "$sha" 2> "$log"); then
@@ -92,12 +96,12 @@ jobs:
           node --test plugins/pstack/skills/*/scripts/test/*.test.mjs || checks=failed
           { echo "tree=$(git rev-parse "$commit^{tree}")"; echo "checks=$checks"; } >> "$GITHUB_OUTPUT"
       # A failed scheduled run is what notifies the owner.
-      - name: Fail on an overlay that no longer applies
+      - name: Fail on a patch that no longer applies
         if: steps.build.outputs.overlay == 'failed'
         env:
           SHA: ${{ steps.build.outputs.sha }}
         run: |
-          echo "::error::The overlay does not apply to upstream ${SHA:0:7}. Redo the failing patch for it (FORK.md, When a patch no longer applies)."
+          echo "::error::A patch does not apply to upstream ${SHA:0:7}. Redo it for that commit (FORK.md, When a patch no longer applies)."
           exit 1
 
   publish:
@@ -108,21 +112,22 @@ jobs:
     permissions:
       contents: write # pushes the upstream-sync/<sha> branch
       pull-requests: write # opens the sync pull request and closes the ones it supersedes
-    env:
-      # GITHUB_TOKEN cannot push a commit that changes a workflow, and its pull
-      # requests start no other workflow. A token with contents, workflows, and
-      # pull requests write in FORK_SYNC_TOKEN does both.
-      GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
-      SHA: ${{ needs.build.outputs.sha }}
-      TREE: ${{ needs.build.outputs.tree }}
-      CHECKS: ${{ needs.build.outputs.checks }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      # GITHUB_TOKEN on purpose: it cannot push a commit that changes a
+      # workflow, and what it pushes or opens starts no workflow, so no
+      # upstream workflow runs here before a person reads it.
       - name: Push the sync branch and open its pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.build.outputs.sha }}
+          TREE: ${{ needs.build.outputs.tree }}
+          CHECKS: ${{ needs.build.outputs.checks }}
         run: |
           set -euo pipefail
           git fetch --no-tags "$UPSTREAM" +main:refs/remotes/upstream/main
@@ -136,37 +141,39 @@ jobs:
           branch="upstream-sync/${sha:0:7}"
           if [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
             echo "a pull request from $branch already exists"
-          else
-            commit=$(node tools/fork/fork.mjs sync "$sha")
-            if [ "$(git rev-parse "$commit^{tree}")" != "$TREE" ]; then
-              echo "::error::The rebuilt tree differs from the one the build job tested"
-              exit 1
-            fi
-            gh auth setup-git
-            # Forced, so a run whose pull request failed to open can redo both.
-            git push --force origin "$commit:refs/heads/$branch"
-            body="$RUNNER_TEMP/body.md"
-            {
-              echo "Rebuilds upstream [\`${sha:0:7}\`](https://github.com/chhoumann/t3-pstack/commit/$sha) with this fork's overlay (FORK.md)."
-              echo
-              echo "The generator check, \`bun test tests/\`, and the skill script tests: **$checks** ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID))."
-              echo "The rest of \`ci.yml\` runs on this pull request only when the \`FORK_SYNC_TOKEN\` secret opened it."
-            } > "$body"
-            draft=()
-            [ "$checks" = passed ] || draft=(--draft)
-            gh pr create --base main --head "$branch" "${draft[@]}" \
-              --title "Sync upstream to ${sha:0:7}" --body-file "$body"
+            exit 0
           fi
-          # A closed pull request for this commit supersedes nothing.
-          read -r number state < <(gh pr view "$branch" --json number,state --jq '"\(.number) \(.state)"')
-          [ "$state" = OPEN ] || exit 0
+          commit=$(node tools/fork/fork.mjs sync "$sha")
+          if [ "$(git rev-parse "$commit^{tree}")" != "$TREE" ]; then
+            echo "::error::The rebuilt tree differs from the one the build job tested"
+            exit 1
+          fi
+          gh auth setup-git
+          # Forced, so a run whose pull request failed to open can redo both.
+          git push --force origin "$commit:refs/heads/$branch"
+          body="$RUNNER_TEMP/body.md"
+          {
+            echo "Rebuilds upstream [\`${sha:0:7}\`](https://github.com/chhoumann/t3-pstack/commit/$sha) with this fork's overlay (FORK.md)."
+            echo
+            echo "The generator check, \`bun test tests/\`, and the skill script tests: **$checks** ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID))."
+            echo "No other workflow runs on a pull request this job opens. Close and reopen it to run \`ci.yml\` and the overlay check."
+          } > "$body"
+          draft=()
+          [ "$checks" = passed ] || draft=(--draft)
+          gh pr create --base main --head "$branch" "${draft[@]}" \
+            --title "Sync upstream to ${sha:0:7}" --body-file "$body"
+          echo "created=$checks" >> "$GITHUB_OUTPUT"
+          # Only a passing sync supersedes the others. Their branches stay, in
+          # case one holds a fix.
+          [ "$checks" = passed ] || exit 0
+          number=$(gh pr view "$branch" --json number --jq .number)
           gh pr list --state open --json number,headRefName \
             --jq ".[] | select(.headRefName | startswith(\"upstream-sync/\")) | select(.number != $number) | .number" |
             while read -r old; do
-              gh pr close "$old" --delete-branch --comment "Superseded by #$number."
+              gh pr close "$old" --comment "Superseded by #$number."
             done
-      - name: Fail on a sync commit whose checks failed
-        if: needs.build.outputs.checks == 'failed'
+      - name: Fail on a new sync pull request whose checks failed
+        if: steps.pr.outputs.created == 'failed'
         run: |
           echo "::error::The sync pull request is a draft: its generator check or tests failed."
           exit 1

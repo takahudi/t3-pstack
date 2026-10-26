@@ -2,7 +2,7 @@
 // `upstream` branch plays chhoumann/t3-pstack and whose `main` plays the fork.
 import { beforeEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,7 +105,9 @@ describe("fork overlay", () => {
     expect(fork(scratch, "apply", scratch).status).toBe(1);
     git(scratch, "add", "-A");
     write(scratch, "a.txt", "one\nDEUX\nthree\n");
-    write(repo, "tools/fork/patches/10-a.patch", git(scratch, "diff", "--", "a.txt") + "\n");
+    write(scratch, "tools/fork/patches/10-a.patch", git(scratch, "diff", "--", "a.txt") + "\n");
+    expect(fork(scratch, "apply", scratch).status).toBe(0);
+    write(repo, "tools/fork/patches/10-a.patch", readFileSync(join(scratch, "tools/fork/patches/10-a.patch"), "utf8"));
     git(repo, "worktree", "remove", "--force", scratch);
     git(repo, "commit", "-q", "-am", "redo the a.txt patch");
 

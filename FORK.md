@@ -47,13 +47,20 @@ node tools/fork/fork.mjs sync <ref>       # print a commit on HEAD whose tree is
 
 `verify` fetches `upstreamSha` from upstream when the clone lacks it.
 
-[`.github/workflows/fork.yml`](.github/workflows/fork.yml) runs `verify` on every pull request and push to `main`, so an edit to an upstream file that no patch carries fails before it merges. A sync rebuilds from upstream and would drop such an edit. Every day at 03:17 UTC, and on demand from the Actions tab, it fetches upstream's `main`. When that has moved, the `build` job rebuilds it with the overlay and runs the generator check, `bun test tests/`, and the skill script tests on it. That job holds no write token, since those checks run upstream's code. The `publish` job runs only this fork's `fork.mjs`, pushes the same tree to `upstream-sync/<sha>`, opens a pull request, and closes the sync pull requests it supersedes. When a check fails, the pull request is a draft. When a patch no longer applies, there is no pull request. Either way the run fails, so GitHub notifies you, and its log names the cause. Merge a sync pull request with a merge commit or a squash. `upstreamSha` records the base either way.
+[`.github/workflows/fork.yml`](.github/workflows/fork.yml) runs `verify` on every pull request and push to `main`, so an edit to an upstream file that no patch carries fails before it merges. A sync rebuilds from upstream and would drop such an edit.
 
-Give the `publish` job a token in the `FORK_SYNC_TOKEN` repository secret: a fine-grained personal access token for this repository with Contents, Workflows, and Pull requests set to read and write. Without it the job falls back to `GITHUB_TOKEN`, which has three limits:
+Every day at 03:17 UTC, and on demand from the Actions tab, it fetches upstream's `main`. When that has moved:
 
-- it cannot push a sync commit in which upstream changed a workflow file;
-- the pull requests it opens do not start `ci.yml`;
-- it opens pull requests only when **Settings > Actions > General > Allow GitHub Actions to create and approve pull requests** is on.
+- The `build` job verifies `main`, rebuilds the upstream commit with the overlay, and runs the generator check, `bun test tests/`, and the skill script tests on it. It holds no write token, since those checks run upstream's code.
+- The `publish` job takes its code from the commit that started the run, never from `build`'s outputs. It rebuilds the same tree, pushes it to `upstream-sync/<sha>`, and opens a pull request. A sync whose checks passed closes the older sync pull requests and keeps their branches.
+
+When a check fails, the pull request is a draft and the run that opened it fails. When a patch no longer applies, or `main` has drifted from the overlay, there is no pull request and the run fails every day until it is fixed. GitHub notifies you of a failed run, and its log names the cause. Merge a sync pull request with a merge commit or a squash. `upstreamSha` records the base either way.
+
+The jobs use `GITHUB_TOKEN` on purpose. It cannot push a commit that changes a workflow, and nothing it pushes or opens starts a workflow, so no upstream workflow runs with this repository's secrets before you read it. That has three consequences:
+
+- Turn on **Settings > Actions > General > Allow GitHub Actions to create and approve pull requests**, or the job cannot open pull requests.
+- A sync pull request starts no other workflow. Close and reopen it to run `ci.yml` and the `overlay` check on it.
+- A sync in which upstream changed a workflow file fails to push. Read the workflow diff, then push the sync yourself: `git switch -c upstream-sync/<sha> main`, `git merge --ff-only "$(node tools/fork/fork.mjs sync <sha>)"`, and push the branch.
 
 ### Changing the fork
 
@@ -63,23 +70,35 @@ Give the `publish` job a token in the `FORK_SYNC_TOKEN` repository secret: a fin
 
 ### When a patch no longer applies
 
-The failed run names the patch and the upstream commit `<sha>`. Redo the patch on that commit, then sync with `--repair`, which skips the check that the patches still apply to the old `upstreamSha`:
+The failed run names the upstream commit `<sha>`. Redo each patch that stops applying on that commit, then sync with `--repair`. `--repair` skips the check that `main`'s patches still apply to the old `upstreamSha`, so use it only for this. A run that fails at "Verify main is upstreamSha plus the overlay" means an edit on `main` that no patch carries: put it in a patch first.
 
 ```shell
 git switch -c repair/<sha> main
 git fetch --no-tags https://github.com/chhoumann/t3-pstack.git main
 git worktree add --detach ../t3-pstack-upstream <sha>
 git -C ../t3-pstack-upstream checkout repair/<sha> -- tools/fork
-node tools/fork/fork.mjs apply ../t3-pstack-upstream   # applies the overlay up to the failing patch, then stops
+node tools/fork/fork.mjs apply ../t3-pstack-upstream
+```
+
+`apply` stops at the first patch that does not apply, with the ones before it applied. Until it exits 0, repeat:
+
+```shell
 git -C ../t3-pstack-upstream add -A
-# redo the failing patch's change in ../t3-pstack-upstream, then:
-git -C ../t3-pstack-upstream diff -- <its files> > tools/fork/patches/<the failing patch>
+# redo the stopped patch's change in ../t3-pstack-upstream, then:
+git -C ../t3-pstack-upstream diff -- <its files> > ../t3-pstack-upstream/tools/fork/patches/<the stopped patch>
+node tools/fork/fork.mjs apply ../t3-pstack-upstream
+```
+
+Then bring the patches back and sync:
+
+```shell
+cp ../t3-pstack-upstream/tools/fork/patches/*.patch tools/fork/patches/
 git worktree remove --force ../t3-pstack-upstream
-git commit -am "Redo <the failing patch> for upstream <sha>"
+git commit -am "Redo the fork's patches for upstream <sha>"
 git merge --ff-only "$(node tools/fork/fork.mjs sync <sha> --repair)"
 ```
 
-Push the branch and open a pull request. Its `overlay` check verifies the result against the new `upstreamSha`.
+Push the branch and open a pull request. Its `overlay` check verifies the result against the new `upstreamSha`. The same steps fix a sync draft whose checks failed because of a patch.
 
 ## Known limits
 

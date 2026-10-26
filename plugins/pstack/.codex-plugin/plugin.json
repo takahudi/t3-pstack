@@ -6,8 +6,8 @@
     "name": "Christian Bager Bach Houmann",
     "url": "https://github.com/chhoumann"
   },
-  "homepage": "https://github.com/chhoumann/t3-pstack",
-  "repository": "https://github.com/chhoumann/t3-pstack",
+  "homepage": "https://github.com/takahudi/t3-pstack",
+  "repository": "https://github.com/takahudi/t3-pstack",
   "license": "MIT",
   "keywords": [
     "t3-code",
@@ -42,7 +42,7 @@
       "Work on this in poteto-mode.",
       "Interrogate this diff with multiple models."
     ],
-    "websiteURL": "https://github.com/chhoumann/t3-pstack",
+    "websiteURL": "https://github.com/takahudi/t3-pstack",
     "brandColor": "#7C3AED",
     "composerIcon": "./assets/pstack-icon.png",
     "logo": "./assets/pstack-icon.png"

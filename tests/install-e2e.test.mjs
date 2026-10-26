@@ -311,7 +311,7 @@ describe.skipIf(!enabled)("the installer, on a t3-pstack marketplace from anothe
     expect(status).toBe(1);
     expect(row(report, ".codex").steps).toEqual([]);
     expect(row(report, ".claude").steps).toEqual([]);
-    const foreign = `marketplace: ${counterfeit}, which is neither chhoumann/t3-pstack nor --source`;
+    const foreign = `marketplace: ${counterfeit}, which is neither takahudi/t3-pstack nor --source`;
     expect(failing(row(report, ".codex").checks)).toEqual([
       foreign,
       `session-start hook trusted: ${HOOK} untrusted, not from the hooks/codex-hooks.json this release pins`,
@@ -334,7 +334,7 @@ describe.skipIf(!enabled)("the installer, on a t3-pstack marketplace from anothe
     expect(status).toBe(1);
     expect(report.homes.flatMap((h) => h.steps)).toEqual([]);
     expect(failing(row(report, ".codex-dev").checks)).toEqual([
-      `marketplace: ${repoRoot.replace(/\/$/, "")}, which is neither chhoumann/t3-pstack nor --source`,
+      `marketplace: ${repoRoot.replace(/\/$/, "")}, which is neither takahudi/t3-pstack nor --source`,
     ]);
     expect(snapshot()).toEqual(before);
   }, 300_000);

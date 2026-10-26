@@ -1,0 +1,26 @@
+diff --git a/plugins/pstack/skills/thermos/SKILL.md b/plugins/pstack/skills/thermos/SKILL.md
+index eeefd9f..0bcde73 100644
+--- a/plugins/pstack/skills/thermos/SKILL.md
++++ b/plugins/pstack/skills/thermos/SKILL.md
+@@ -12,7 +12,7 @@ Run the two thermo review passes as async background subagents in parallel, then
+ 
+ 1. Determine the review scope from the user request, PR, current branch, or relevant changed files.
+ 2. Gather the diff and any file/context excerpts needed for reviewers to evaluate the change without guessing.
+-3. Launch both subagents in the same response as two `delegate_task` calls with `mode: "async"` and `role: "review"`, on the first two model families of the `interrogate reviewers` sheet line (`<plugin root>` is the directory that holds this plugin's `skills/`):
++3. Launch both subagents in the same response as two `delegate_task` calls with `mode: "async"` and `role: "review"`, on the first two model families of the `interrogate reviewers` sheet line, or its first two seats on a single provider (`<plugin root>` is the directory that holds this plugin's `skills/`):
+    - a brief that opens with "Read `<plugin root>/agents/thermo-nuclear-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-review/SKILL.md` in full and act as they say" for bugs, breakages, security, devex regressions, feature-flag leaks, and other branch-audit risks.
+    - a brief that opens with "Read `<plugin root>/agents/thermo-nuclear-code-quality-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-code-quality-review/SKILL.md` in full and act as they say" for maintainability, structure, file-size growth, spaghetti, abstractions, and codebase-health risks.
+ 4. Pass each subagent the same scoped diff/file context and ask it to return prioritized findings with file references and evidence.
+diff --git a/tools/substitutions.json b/tools/substitutions.json
+index 1b961b5..3a50bf7 100644
+--- a/tools/substitutions.json
++++ b/tools/substitutions.json
+@@ -331,7 +331,7 @@
+     },
+     {
+       "pattern": "3. Launch both subagents in the same message with `run_in_background: true`:",
+-      "replacement": "3. Launch both subagents in the same response as two `delegate_task` calls with `mode: \"async\"` and `role: \"review\"`, on the first two model families of the `interrogate reviewers` sheet line (`<plugin root>` is the directory that holds this plugin's `skills/`):",
++      "replacement": "3. Launch both subagents in the same response as two `delegate_task` calls with `mode: \"async\"` and `role: \"review\"`, on the first two model families of the `interrogate reviewers` sheet line, or its first two seats on a single provider (`<plugin root>` is the directory that holds this plugin's `skills/`):",
+       "rationale": "Per-skill notes: thermos",
+       "files": "^skills/thermos/SKILL\\.md$"
+     },

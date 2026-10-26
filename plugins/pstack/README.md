@@ -17,10 +17,10 @@ t3-pstack has no server or telemetry. Anything its skills ask your agent to read
 
 ## Links
 
-- [Install and setup](https://github.com/chhoumann/t3-pstack#readme)
-- [Issues and support](https://github.com/chhoumann/t3-pstack/issues)
-- [Security policy](https://github.com/chhoumann/t3-pstack/blob/main/SECURITY.md)
+- [Install and setup](https://github.com/takahudi/t3-pstack#readme)
+- [Issues and support](https://github.com/takahudi/t3-pstack/issues)
+- [Security policy](https://github.com/takahudi/t3-pstack/blob/main/SECURITY.md)
 
 ## License
 
-MIT. Original pstack © 2026 Lauren Tan; imported cursor-team-kit and thermos skills © 2026 Cursor; T3 modifications © 2026 Christian Bager Bach Houmann. See [NOTICE.md](https://github.com/chhoumann/t3-pstack/blob/main/NOTICE.md).
+MIT. Original pstack © 2026 Lauren Tan; imported cursor-team-kit and thermos skills © 2026 Cursor; T3 modifications © 2026 Christian Bager Bach Houmann. See [NOTICE.md](https://github.com/takahudi/t3-pstack/blob/main/NOTICE.md).

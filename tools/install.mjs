@@ -7,13 +7,13 @@
 // the Codex app-server it starts refreshes a Git marketplace, as any T3 Codex
 // thread does. Both exit 1 when a check fails.
 //
-// Each home's t3-pstack marketplace must come from chhoumann/t3-pstack or from
+// Each home's t3-pstack marketplace must come from takahudi/t3-pstack or from
 // this run's --source. A home whose marketplace has another source, such as a
 // local --source from an earlier run, gets nothing installed and no hook
 // trusted, and doctor fails it with that source.
 //
-//   npx -y github:chhoumann/t3-pstack <install|update|doctor>
-//     --source <owner/repo|git URL|dir>   marketplace source, default chhoumann/t3-pstack
+//   npx -y github:takahudi/t3-pstack <install|update|doctor>
+//     --source <owner/repo|git URL|dir>   marketplace source, default takahudi/t3-pstack
 //     --claude-home <dir>, --codex-home <dir>   more homes, repeatable
 //     --catalog <file>   an orchestrator_capabilities dump to check the sheet's targets against
 //     --json

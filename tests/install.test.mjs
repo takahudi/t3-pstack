@@ -31,7 +31,7 @@ import { doctorSheet, moveSheet } from "../tools/install/sheet.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const { roles, tiers } = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));
-const FIX = "rerun `npx -y github:chhoumann/t3-pstack install`";
+const FIX = "rerun `npx -y github:takahudi/t3-pstack install`";
 
 const scratch = [];
 function tmp() {
@@ -51,7 +51,7 @@ const mode = (path) => statSync(path).mode & 0o777;
 // The plugin's own skills, and a doctor context that trusts the GitHub repo.
 const SKILL = (name) => readFileSync(join(repoRoot, "plugins/pstack/skills", name, "SKILL.md"), "utf8");
 const skills = new Map(["how", "why"].map((name) => [name, SKILL(name)]));
-const github = parseSource("chhoumann/t3-pstack", "/home/u");
+const github = parseSource("takahudi/t3-pstack", "/home/u");
 const context = { source: github, trusted: new Set([github.key]), version: "2.0.0-rc.3", skills };
 
 // A `claude` that records each call and changes nothing.
@@ -169,7 +169,7 @@ function claudeHome({ autoUpdate } = {}) {
   writeJson(join(dir, "settings.json"), {
     enabledPlugins: { "t3-pstack@t3-pstack": true },
     extraKnownMarketplaces: {
-      "t3-pstack": { source: { source: "github", repo: "chhoumann/t3-pstack" }, ...(autoUpdate && { autoUpdate }) },
+      "t3-pstack": { source: { source: "github", repo: "takahudi/t3-pstack" }, ...(autoUpdate && { autoUpdate }) },
     },
   });
   return { dir, user, project, other };
@@ -221,7 +221,7 @@ describe("a stale other-scope Claude Code record", () => {
     writeFileSync(join(dir, "skills/how/SKILL.md"), SKILL("how"));
     const home = { harness: "claude", dir, from: ["default"], bin: "claude" };
     expect(doctorClaude(home, context)).toEqual([
-      { name: "marketplace", ok: true, detail: "chhoumann/t3-pstack" },
+      { name: "marketplace", ok: true, detail: "takahudi/t3-pstack" },
       { name: "installed", ok: true, detail: "2.0.0-rc.3" },
       { name: "enabled", ok: true, detail: "yes" },
       { name: "marketplace auto-update", ok: false, detail: "false", fix: FIX },
@@ -316,7 +316,7 @@ describe("a t3-pstack marketplace from another source", () => {
     expect(doctorClaude(home, context)[0]).toEqual({
       name: "marketplace",
       ok: false,
-      detail: `${elsewhere}, which is neither chhoumann/t3-pstack nor --source`,
+      detail: `${elsewhere}, which is neither takahudi/t3-pstack nor --source`,
       fix: `if you trust it, rerun with --source ${elsewhere}; otherwise remove it with \`CLAUDE_CONFIG_DIR=${dir} claude plugin marketplace remove t3-pstack\`, then ${FIX}`,
     });
   });
@@ -336,8 +336,8 @@ describe("a t3-pstack marketplace from another source", () => {
 describe("--source", () => {
   test("reads owner/repo as GitHub even where that relative directory exists, and a URL to the same repository as the same source", () => {
     const cwd = tmp();
-    mkdirSync(join(cwd, "chhoumann/t3-pstack"), { recursive: true });
-    const r = spawnSync(process.execPath, [join(repoRoot, "tools/install.mjs"), "doctor", "--source", "chhoumann/t3-pstack", "--json"], {
+    mkdirSync(join(cwd, "takahudi/t3-pstack"), { recursive: true });
+    const r = spawnSync(process.execPath, [join(repoRoot, "tools/install.mjs"), "doctor", "--source", "takahudi/t3-pstack", "--json"], {
       cwd,
       env: { HOME: tmp(), PATH: tmp() },
       encoding: "utf8",
@@ -345,10 +345,10 @@ describe("--source", () => {
     expect({ status: r.status, stderr: r.stderr, source: r.status === 0 && JSON.parse(r.stdout).source }).toEqual({
       status: 0,
       stderr: "",
-      source: "chhoumann/t3-pstack",
+      source: "takahudi/t3-pstack",
     });
-    expect(parseSource("git@github.com:ChHoumann/t3-pstack.git", "/home/u").key).toBe(github.key);
-    expect(parseSource("https://github.com/chhoumann/t3-pstack", "/home/u").key).toBe(github.key);
+    expect(parseSource("git@github.com:TakaHudi/t3-pstack.git", "/home/u").key).toBe(github.key);
+    expect(parseSource("https://github.com/takahudi/t3-pstack", "/home/u").key).toBe(github.key);
     expect(() => parseSource("./missing", cwd)).toThrow("--source ./missing: not owner/repo, a Git URL, or an existing directory");
   });
 });

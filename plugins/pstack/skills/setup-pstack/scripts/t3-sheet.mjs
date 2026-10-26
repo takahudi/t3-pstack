@@ -111,11 +111,13 @@ export function checkSheet(sheet, { roles, defaults, catalog }) {
     }
     const targets = texts.map((t) => t.trim()).filter((t) => !INHERIT.includes(t));
     if (new Set(targets).size < targets.length) problems.push(`${key}: lists the same target twice`);
+    // On a single provider a panel spans one family, so it needs two seats there.
     if (role.tier === "panel") {
       const families = panelFamilies(runnable);
-      if (families.size < 2) {
+      const seats = runnable.length + entries.filter((e) => e === null).length;
+      if (families.size === 0 || (families.size === 1 && seats < 2)) {
         problems.push(
-          `${key}: a panel needs at least two model families among its targets (inherit-parent does not count), got ${[...families].join(", ") || "none"}`,
+          `${key}: a panel needs at least two model families among its targets, or two seats on its one family (inherit-parent and auto are seats, not families), got ${[...families].join(", ") || "none"}`,
         );
       }
     }

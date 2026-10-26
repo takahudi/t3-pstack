@@ -1,0 +1,12 @@
+diff --git a/README.md b/README.md
+index cea3da6..85e75f7 100644
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,7 @@
+ # t3-pstack
+ 
++> This fork of Christian Bager Bach Houmann's t3-pstack also runs on a single provider, such as only Claude Code or only Codex, and its installer installs this fork. [FORK.md](FORK.md) lists what differs and how the fork follows upstream.
++
+ pstack for [T3 Code](https://github.com/pingdotgg/t3code). It is Lauren Tan's (poteto's) [pstack](https://github.com/cursor/plugins/tree/main/pstack), with its Cursor mechanics rewritten in place for T3. Every subagent, panel, fan-out, schedule, and PR watch dispatches through T3's `t3-code` MCP tools, so an `interrogate`, `arena`, or `architect` panel can run Claude, GPT, and Grok reviewers side by side, from a Claude Code thread or a Codex thread.
+ 
+ The skill text is Lauren's. A generated set of substitutions rewrites only what names Cursor (its `Task` tool, its model slugs, its `.mdc` rule, its cloud agents, `/loop`), and a few declared forks carry what a substitution cannot. Nothing else needs loading: the T3 rules sit where Lauren's dispatch rules sit.

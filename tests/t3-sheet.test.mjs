@@ -138,7 +138,7 @@ describe("checkSheet against a catalog", () => {
   test("a sheet on a single provider dispatches with every panel on that provider's family", () => {
     const sheets = {
       claudeAgent: ["claudeAgent/claude-opus-5-5 effort=xhigh", "claudeAgent/claude-fable-5-1 effort=xhigh"],
-      codex: ["codex/gpt-6.1-sol reasoningEffort=xhigh", "codex/gpt-6.1-sol reasoningEffort=high"],
+      codex: ["codex/gpt-6.1-sol reasoningEffort=xhigh", "inherit-parent"],
     };
     for (const [only, [one, other]] of Object.entries(sheets)) {
       const single = structuredClone(catalog);

@@ -6,14 +6,14 @@
 
 Upstream needs at least two model families. Its panels (`arena runners`, `architect runners`, `interrogate reviewers`) must span two families, and a required review stays `BLOCKED: independent review` until a reviewer from another family runs. On a T3 with only Claude Code or only Codex, that gate never opens.
 
-Here, pstack runs on a single provider when the sheet's `interrogate reviewers` line names one family, or, with no such line, when `orchestrator_capabilities` lists models of one family only. Every rule that asks for another family then takes another model of the same family, or a fresh child on the same model, and that reviewer opens the gate. Run `/t3-pstack:setup-pstack` and give every role your provider's targets. Give each panel two or more seats on that family, as different models or as one model at two reasoning levels:
+Here, pstack runs on a single provider when the sheet's `interrogate reviewers` line names one family, or, with no such line, when `orchestrator_capabilities` lists models of one family only. Every rule that asks for another family then takes another model of the same family, or a fresh child on the same model, and that reviewer opens the gate. Run `/t3-pstack:setup-pstack` and give every role your provider's targets. Give each panel two or more seats on that family. Use different models, or, when the provider has one model, that model and `inherit-parent`. One model at two reasoning levels would not survive a later budget change, which sets both to one level and makes them the same target:
 
 ```markdown
 interrogate reviewers: claudeAgent/claude-opus-5-5 effort=xhigh, claudeAgent/claude-fable-5-1 effort=xhigh
 ```
 
 ```markdown
-interrogate reviewers: codex/gpt-6.1-sol reasoningEffort=xhigh, codex/gpt-6.1-sol reasoningEffort=high
+interrogate reviewers: codex/gpt-6.1-sol reasoningEffort=xhigh, inherit-parent
 ```
 
 The sheet checker accepts a panel with two families, or with two seats on its one family. A multi-provider sheet works as upstream's does.
@@ -47,7 +47,11 @@ node tools/fork/fork.mjs sync <ref>       # print a commit on HEAD whose tree is
 
 [`.github/workflows/fork.yml`](.github/workflows/fork.yml) runs `verify` on every pull request and push to `main`, so an edit to an upstream file that no patch carries fails before it merges. A sync rebuilds from upstream and would drop such an edit. Every day at 03:17 UTC, and on demand from the Actions tab, it fetches upstream's `main`. When that has moved, it builds the sync commit, runs the generator check and the tests on it, pushes `upstream-sync/<sha>`, and opens a pull request. When a check fails, the pull request is a draft. When a patch no longer applies, there is no pull request. Either way the run fails, so GitHub notifies you, and its log names the cause. Merge a sync pull request with a merge commit or a squash. `upstreamSha` records the base either way.
 
-A pull request opened with `GITHUB_TOKEN` does not start other workflows, so `ci.yml` does not run on a sync pull request. The sync job runs the generator check and the test suite itself. The workflow needs **Settings > Actions > General > Allow GitHub Actions to create and approve pull requests**.
+The sync job runs the generator check and the test suite itself. Give it a token in the `FORK_SYNC_TOKEN` repository secret: a fine-grained personal access token for this repository with Contents, Workflows, and Pull requests set to read and write. Without it the job falls back to `GITHUB_TOKEN`, which has three limits:
+
+- it cannot push a sync commit in which upstream changed a workflow file;
+- the pull requests it opens do not start `ci.yml`;
+- it opens pull requests only when **Settings > Actions > General > Allow GitHub Actions to create and approve pull requests** is on.
 
 ### Changing the fork
 

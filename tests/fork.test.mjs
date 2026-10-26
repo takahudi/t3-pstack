@@ -96,4 +96,25 @@ describe("fork overlay", () => {
     expect(r.stderr).toContain("tools/fork/patches/10-a.patch no longer applies");
     expect(git(repo, "worktree", "list").split("\n")).toHaveLength(1);
   });
+
+  test("a patch redone for the new upstream, as FORK.md describes, syncs with --repair", () => {
+    const next = upstreamCommit({ "a.txt": "one\ndeux\nthree\n" });
+    const scratch = join(mkdtempSync(join(tmpdir(), "fork-repair-")), "up");
+    git(repo, "worktree", "add", "-q", "--detach", scratch, next);
+    git(scratch, "checkout", "main", "--", "tools/fork");
+    expect(fork(scratch, "apply", scratch).status).toBe(1);
+    git(scratch, "add", "-A");
+    write(scratch, "a.txt", "one\nDEUX\nthree\n");
+    write(repo, "tools/fork/patches/10-a.patch", git(scratch, "diff", "--", "a.txt") + "\n");
+    git(repo, "worktree", "remove", "--force", scratch);
+    git(repo, "commit", "-q", "-am", "redo the a.txt patch");
+
+    expect(fork(repo, "sync", next).status).toBe(1);
+    const r = fork(repo, "sync", next, "--repair");
+    expect(r.status).toBe(0);
+    const commit = r.stdout.trim();
+    expect(git(repo, "show", `${commit}:a.txt`)).toBe("one\nDEUX\nthree");
+    git(repo, "checkout", "-q", commit);
+    expect(fork(repo, "verify").status).toBe(0);
+  });
 });

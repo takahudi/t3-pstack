@@ -117,7 +117,7 @@ export function checkSheet(sheet, { roles, defaults, catalog }) {
       const seats = runnable.length + entries.filter((e) => e === null).length;
       if (families.size === 0 || (families.size === 1 && seats < 2)) {
         problems.push(
-          `${key}: a panel needs at least two model families among its targets, or two seats on its one family (inherit-parent is a seat, not a family), got ${[...families].join(", ") || "none"}`,
+          `${key}: a panel needs at least two model families among its targets, or two seats on its one family (inherit-parent and auto are seats, not families), got ${[...families].join(", ") || "none"}`,
         );
       }
     }

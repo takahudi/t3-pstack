@@ -9,6 +9,7 @@
 //   node tools/fork/fork.mjs verify            HEAD must equal its upstreamSha rebuilt
 //   node tools/fork/fork.mjs sync <ref>        print a commit on HEAD rebuilt from <ref>,
 //                                              or nothing when HEAD already carries it
+//                              [--repair]      skip verify, for patches redone for <ref>
 //
 // Run from anywhere inside the repository. verify and sync read committed
 // files only, so commit before running them.
@@ -82,7 +83,11 @@ function rebuild(root, ref, record) {
 // Paths where HEAD departs from its own upstreamSha rebuilt. A sync rebuilds
 // from upstream, so an edit there that no patch carries would be dropped.
 function drift(root) {
-  const tree = rebuild(root, committedConfig(root).upstreamSha);
+  const { upstream, upstreamSha } = committedConfig(root);
+  if (!gitOk(root, "cat-file", "-e", `${upstreamSha}^{commit}`)) {
+    git(root, "fetch", "--no-tags", `https://github.com/${upstream}.git`, upstreamSha);
+  }
+  const tree = rebuild(root, upstreamSha);
   return git(root, "diff", "--name-only", tree, "HEAD").split("\n").filter(Boolean);
 }
 
@@ -96,27 +101,29 @@ function verify(root) {
   }
 }
 
-function sync(root, ref) {
+// `repair` is for a HEAD whose patches were redone for `ref`, so they need not
+// apply to the old upstreamSha any more.
+function sync(root, ref, { repair = false } = {}) {
   const sha = git(root, "rev-parse", `${ref}^{commit}`);
   const { upstream, upstreamSha } = committedConfig(root);
   if (sha === upstreamSha) return null;
-  verify(root);
+  if (!repair) verify(root);
   const tree = rebuild(root, sha, sha);
   return git(root, "commit-tree", tree, "-p", "HEAD", "-p", sha, "-m", `Sync ${upstream} to ${sha.slice(0, 7)}`);
 }
 
 const invoked = process.argv[1] && existsSync(process.argv[1]) ? realpathSync(process.argv[1]) : null;
 if (invoked === fileURLToPath(import.meta.url)) {
-  const [command, arg] = process.argv.slice(2);
+  const [command, arg, ...flags] = process.argv.slice(2);
   try {
     const root = git(process.cwd(), "rev-parse", "--show-toplevel");
     if (command === "apply") apply(arg ?? root);
     else if (command === "verify") verify(root);
-    else if (command === "sync" && arg) {
-      const commit = sync(root, arg);
+    else if (command === "sync" && arg && flags.every((f) => f === "--repair")) {
+      const commit = sync(root, arg, { repair: flags.includes("--repair") });
       if (commit) console.log(commit);
     } else {
-      console.error("usage: fork.mjs apply [dir] | verify | sync <upstream-ref>");
+      console.error("usage: fork.mjs apply [dir] | verify | sync <upstream-ref> [--repair]");
       process.exit(2);
     }
   } catch (err) {

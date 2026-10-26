@@ -331,7 +331,7 @@
     },
     {
       "pattern": "3. Launch both subagents in the same message with `run_in_background: true`:",
-      "replacement": "3. Launch both subagents in the same response as two `delegate_task` calls with `mode: \"async\"` and `role: \"review\"`, on the first two model families of the `interrogate reviewers` sheet line (`<plugin root>` is the directory that holds this plugin's `skills/`):",
+      "replacement": "3. Launch both subagents in the same response as two `delegate_task` calls with `mode: \"async\"` and `role: \"review\"`, on the first two model families of the `interrogate reviewers` sheet line, or its first two seats on a single provider (`<plugin root>` is the directory that holds this plugin's `skills/`):",
       "rationale": "Per-skill notes: thermos",
       "files": "^skills/thermos/SKILL\\.md$"
     },

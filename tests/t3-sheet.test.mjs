@@ -20,7 +20,7 @@ const { roles, tiers: defaults } = loadModels();
 const check = (text, over = catalog) => checkSheet(parseSheet(text), { roles, defaults, catalog: over });
 const PANEL = "interrogate reviewers";
 const NEEDS_SEATS =
-  "a panel needs at least two model families among its targets, or two seats on its one family (inherit-parent is a seat, not a family), got";
+  "a panel needs at least two model families among its targets, or two seats on its one family (inherit-parent and auto are seats, not families), got";
 
 describe("parseEntry", () => {
   test("keeps a Pi model ID that has its own provider prefix", () => {

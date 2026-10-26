@@ -145,40 +145,48 @@ jobs:
           number='' state='' draft=''
           existing=$(gh pr list --head "$branch" --state all --json number,state,isDraft,headRefOid \
             --jq 'first // empty | "\(.number) \(.state) \(.isDraft) \(.headRefOid)"')
+          current=false
           if [ -n "$existing" ]; then
             read -r number state draft head <<< "$existing"
             if [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/$head" --jq .commit.tree.sha)" = "$TREE" ]; then
-              echo "#$number already proposes this tree"
-              exit 0
+              # Already proposed. An open, passing one still retries the supersede
+              # below, in case an earlier run failed partway through it.
+              if [ "$state" != OPEN ] || [ "$checks" != passed ]; then
+                echo "#$number already proposes this tree"
+                exit 0
+              fi
+              current=true
             fi
           fi
-          commit=$(node tools/fork/fork.mjs sync "$sha")
-          if [ "$(git rev-parse "$commit^{tree}")" != "$TREE" ]; then
-            echo "::error::The rebuilt tree differs from the one the build job tested"
-            exit 1
+          if [ "$current" = false ]; then
+            commit=$(node tools/fork/fork.mjs sync "$sha")
+            if [ "$(git rev-parse "$commit^{tree}")" != "$TREE" ]; then
+              echo "::error::The rebuilt tree differs from the one the build job tested"
+              exit 1
+            fi
+            gh auth setup-git
+            # Forced: the branch carries only this job's commits.
+            git push --force origin "$commit:refs/heads/$branch"
+            body="$RUNNER_TEMP/body.md"
+            {
+              echo "Rebuilds upstream [\`${sha:0:7}\`](https://github.com/chhoumann/t3-pstack/commit/$sha) with this fork's overlay (FORK.md)."
+              echo
+              echo "The generator check, \`bun test tests/\`, and the skill script tests: **$checks** ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID))."
+              echo "No other workflow runs on a pull request this job opens. Close and reopen it to run \`ci.yml\` and the overlay check."
+            } > "$body"
+            if [ "$state" = OPEN ]; then
+              gh pr edit "$number" --body-file "$body"
+              if [ "$checks" = passed ] && [ "$draft" = true ]; then gh pr ready "$number"; fi
+              if [ "$checks" = failed ] && [ "$draft" = false ]; then gh pr ready "$number" --undo; fi
+            else
+              flags=()
+              [ "$checks" = passed ] || flags=(--draft)
+              gh pr create --base main --head "$branch" "${flags[@]}" \
+                --title "Sync upstream to ${sha:0:7}" --body-file "$body"
+              number=$(gh pr view "$branch" --json number --jq .number)
+            fi
+            echo "published=$checks" >> "$GITHUB_OUTPUT"
           fi
-          gh auth setup-git
-          # Forced: the branch carries only this job's commits.
-          git push --force origin "$commit:refs/heads/$branch"
-          body="$RUNNER_TEMP/body.md"
-          {
-            echo "Rebuilds upstream [\`${sha:0:7}\`](https://github.com/chhoumann/t3-pstack/commit/$sha) with this fork's overlay (FORK.md)."
-            echo
-            echo "The generator check, \`bun test tests/\`, and the skill script tests: **$checks** ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID))."
-            echo "No other workflow runs on a pull request this job opens. Close and reopen it to run \`ci.yml\` and the overlay check."
-          } > "$body"
-          if [ "$state" = OPEN ]; then
-            gh pr edit "$number" --body-file "$body"
-            if [ "$checks" = passed ] && [ "$draft" = true ]; then gh pr ready "$number"; fi
-            if [ "$checks" = failed ] && [ "$draft" = false ]; then gh pr ready "$number" --undo; fi
-          else
-            flags=()
-            [ "$checks" = passed ] || flags=(--draft)
-            gh pr create --base main --head "$branch" "${flags[@]}" \
-              --title "Sync upstream to ${sha:0:7}" --body-file "$body"
-            number=$(gh pr view "$branch" --json number --jq .number)
-          fi
-          echo "published=$checks" >> "$GITHUB_OUTPUT"
           # Only a passing sync supersedes the others. Their branches stay, in
           # case one holds a fix.
           [ "$checks" = passed ] || exit 0

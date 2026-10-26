@@ -42,10 +42,8 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
-      # Pushes the upstream-sync/<sha> branch.
-      contents: write
-      # Opens the sync pull request.
-      pull-requests: write
+      contents: write # pushes the upstream-sync/<sha> branch
+      pull-requests: write # opens the sync pull request
     env:
       GH_TOKEN: ${{ github.token }}
       GIT_AUTHOR_NAME: github-actions[bot]

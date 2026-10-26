@@ -7,8 +7,8 @@
     "name": "Christian Bager Bach Houmann",
     "url": "https://github.com/chhoumann"
   },
-  "homepage": "https://github.com/chhoumann/t3-pstack",
-  "repository": "https://github.com/chhoumann/t3-pstack",
+  "homepage": "https://github.com/takahudi/t3-pstack",
+  "repository": "https://github.com/takahudi/t3-pstack",
   "license": "MIT",
   "bin": {
     "t3-pstack": "tools/install.mjs"

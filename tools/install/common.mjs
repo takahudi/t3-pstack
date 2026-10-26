@@ -9,8 +9,8 @@ import { basename, delimiter, dirname, extname, join, resolve } from "node:path"
 
 export const PLUGIN_ID = "t3-pstack@t3-pstack";
 export const MARKETPLACE = "t3-pstack";
-export const HOME_REPO = "chhoumann/t3-pstack";
-export const INSTALL_HINT = "rerun `npx -y github:chhoumann/t3-pstack install`";
+export const HOME_REPO = "takahudi/t3-pstack";
+export const INSTALL_HINT = "rerun `npx -y github:takahudi/t3-pstack install`";
 
 // `~`, `~/` and `~\` expand as T3 expands them (provider-core
 // pathExpansion.ts). `~user` does not.

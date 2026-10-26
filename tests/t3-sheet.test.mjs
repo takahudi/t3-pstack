@@ -19,6 +19,8 @@ const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
 const { roles, tiers: defaults } = loadModels();
 const check = (text, over = catalog) => checkSheet(parseSheet(text), { roles, defaults, catalog: over });
 const PANEL = "interrogate reviewers";
+const NEEDS_SEATS =
+  "a panel needs at least two model families among its targets, or two seats on its one family (inherit-parent is a seat, not a family), got";
 
 describe("parseEntry", () => {
   test("keeps a Pi model ID that has its own provider prefix", () => {
@@ -69,9 +71,9 @@ describe("parseEntry", () => {
 describe("checkSheet without a catalog", () => {
   test("checks the grammar and the panel rule, not whether a target dispatches here", () => {
     expect(check("bug-fix: someprovider/unlisted-model effort=max\nsession hook: on\n", null)).toEqual([]);
-    expect(check(`bug-fix: claude-opus\n${PANEL}: someprovider/claude-a, otherprovider/claude-b\n`, null)).toEqual([
+    expect(check(`bug-fix: claude-opus\n${PANEL}: someprovider/claude-a\n`, null)).toEqual([
       'bug-fix: "claude-opus" does not start with <providerInstanceId>/<modelId>',
-      `${PANEL}: a panel needs at least two model families among its targets (inherit-parent does not count), got claude`,
+      `${PANEL}: ${NEEDS_SEATS} claude`,
     ]);
   });
 });
@@ -127,17 +129,28 @@ describe("checkSheet against a catalog", () => {
     expect(check(lines, noGrok)).toEqual([]);
   });
 
-  test("a panel on one family fails, whatever providers serve it", () => {
-    expect(check(`${PANEL}: claudeAgent/claude-opus-5-5, codex_pool/claude-opus-5-5`)).toEqual([
-      `${PANEL}: a panel needs at least two model families among its targets (inherit-parent does not count), got claude`,
-    ]);
+  test("a panel on one family needs two seats, whatever providers serve it", () => {
+    expect(check(`${PANEL}: claudeAgent/claude-opus-5-5`)).toEqual([`${PANEL}: ${NEEDS_SEATS} claude`]);
+    expect(check(`${PANEL}: claudeAgent/claude-opus-5-5, codex_pool/claude-opus-5-5`)).toEqual([]);
     expect(check(`${PANEL}: claudeAgent/claude-opus-5-5, grok/grok-4.7`)).toEqual([]);
   });
 
-  test("inherit-parent does not count toward a panel's two families", () => {
-    expect(check(`${PANEL}: inherit-parent, grok/grok-4.7`)).toEqual([
-      `${PANEL}: a panel needs at least two model families among its targets (inherit-parent does not count), got grok`,
-    ]);
+  test("a sheet on a single provider dispatches with every panel on that provider's family", () => {
+    const sheets = {
+      claudeAgent: ["claudeAgent/claude-opus-5-5 effort=xhigh", "claudeAgent/claude-fable-5-1 effort=xhigh"],
+      codex: ["codex/gpt-6.1-sol reasoningEffort=xhigh", "codex/gpt-6.1-sol reasoningEffort=high"],
+    };
+    for (const [only, [one, other]] of Object.entries(sheets)) {
+      const single = structuredClone(catalog);
+      single.providers = single.providers.filter((p) => p.providerInstanceId === only);
+      const sheet = roles.map((r) => `${r.role}: ${r.tier === "panel" ? `${one}, ${other}` : one}`).join("\n");
+      expect(check(sheet, single)).toEqual([]);
+    }
+  });
+
+  test("inherit-parent is a seat, not a family", () => {
+    expect(check(`${PANEL}: inherit-parent`)).toEqual([`${PANEL}: ${NEEDS_SEATS} none`]);
+    expect(check(`${PANEL}: inherit-parent, grok/grok-4.7`)).toEqual([]);
     expect(check(`${PANEL}: auto, claudeAgent/claude-fable-5-1, grok/grok-4.7`)).toEqual([]);
   });
 
@@ -159,7 +172,7 @@ describe("checkSheet against a catalog", () => {
     const otherPanels = roles.filter((r) => r.tier === "panel" && r.role !== PANEL).map((r) => r.role);
     expect(check(`${PANEL}: claudeAgent/claude-opus-5-5, grok/grok-4.7`, noCross)).toEqual([
       `${PANEL}: grok/grok-4.7: "grok" cannot run child tasks`,
-      `${PANEL}: a panel needs at least two model families among its targets (inherit-parent does not count), got claude`,
+      `${PANEL}: ${NEEDS_SEATS} claude`,
       ...otherPanels.map((role) => `${role} (no line, tier default): grok/grok-4.7: "grok" cannot run child tasks`),
     ]);
   });

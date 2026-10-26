@@ -1,0 +1,17 @@
+{
+  "upstream": "chhoumann/t3-pstack",
+  "fork": "takahudi/t3-pstack",
+  "upstreamSha": "238d156cfa0c46d44e17d91ade01678a074c2024",
+  "own": [
+    ".github/workflows/fork.yml",
+    "FORK.md",
+    "tests/fork.test.mjs",
+    "tools/fork"
+  ],
+  "keepUpstreamSlug": [
+    "CHANGES.md",
+    "NOTICE-skills.md",
+    "NOTICE.md",
+    "plugins/pstack/skills/poteto-mode/references/licenses/NOTICE.md"
+  ]
+}

@@ -17,10 +17,10 @@ on:
 permissions:
   contents: read
 
-# Scheduled and manual syncs share one group, so an older sync never finishes
-# after a newer one and closes its pull request.
+# Scheduled and manual syncs of main share one group, so an older sync never
+# finishes after a newer one and closes its pull request.
 concurrency:
-  group: fork-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'sync' || github.ref }}
+  group: fork-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && 'sync' || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -81,6 +81,7 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           if ! commit=$(node tools/fork/fork.mjs sync "$sha" 2> "$log"); then
             cat "$log"
+            grep -q "no longer applies" "$log" || exit 1
             echo "overlay=failed" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -139,9 +140,17 @@ jobs:
           checks=failed
           if [ "$CHECKS" = passed ]; then checks=passed; fi
           branch="upstream-sync/${sha:0:7}"
-          if [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
-            echo "a pull request from $branch already exists"
-            exit 0
+          # The newest pull request from this branch stands unless main's overlay
+          # has changed its tree since. A closed one with the same tree was declined.
+          number= state= draft=
+          existing=$(gh pr list --head "$branch" --state all --json number,state,isDraft,headRefOid \
+            --jq 'first // empty | "\(.number) \(.state) \(.isDraft) \(.headRefOid)"')
+          if [ -n "$existing" ]; then
+            read -r number state draft head <<< "$existing"
+            if [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/$head" --jq .commit.tree.sha)" = "$TREE" ]; then
+              echo "#$number already proposes this tree"
+              exit 0
+            fi
           fi
           commit=$(node tools/fork/fork.mjs sync "$sha")
           if [ "$(git rev-parse "$commit^{tree}")" != "$TREE" ]; then
@@ -149,7 +158,7 @@ jobs:
             exit 1
           fi
           gh auth setup-git
-          # Forced, so a run whose pull request failed to open can redo both.
+          # Forced: the branch carries only this job's commits.
           git push --force origin "$commit:refs/heads/$branch"
           body="$RUNNER_TEMP/body.md"
           {
@@ -158,22 +167,28 @@ jobs:
             echo "The generator check, \`bun test tests/\`, and the skill script tests: **$checks** ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID))."
             echo "No other workflow runs on a pull request this job opens. Close and reopen it to run \`ci.yml\` and the overlay check."
           } > "$body"
-          draft=()
-          [ "$checks" = passed ] || draft=(--draft)
-          gh pr create --base main --head "$branch" "${draft[@]}" \
-            --title "Sync upstream to ${sha:0:7}" --body-file "$body"
-          echo "created=$checks" >> "$GITHUB_OUTPUT"
+          if [ "$state" = OPEN ]; then
+            gh pr edit "$number" --body-file "$body"
+            if [ "$checks" = passed ] && [ "$draft" = true ]; then gh pr ready "$number"; fi
+            if [ "$checks" = failed ] && [ "$draft" = false ]; then gh pr ready "$number" --undo; fi
+          else
+            flags=()
+            [ "$checks" = passed ] || flags=(--draft)
+            gh pr create --base main --head "$branch" "${flags[@]}" \
+              --title "Sync upstream to ${sha:0:7}" --body-file "$body"
+            number=$(gh pr view "$branch" --json number --jq .number)
+          fi
+          echo "published=$checks" >> "$GITHUB_OUTPUT"
           # Only a passing sync supersedes the others. Their branches stay, in
           # case one holds a fix.
           [ "$checks" = passed ] || exit 0
-          number=$(gh pr view "$branch" --json number --jq .number)
           gh pr list --state open --json number,headRefName \
             --jq ".[] | select(.headRefName | startswith(\"upstream-sync/\")) | select(.number != $number) | .number" |
             while read -r old; do
               gh pr close "$old" --comment "Superseded by #$number."
             done
-      - name: Fail on a new sync pull request whose checks failed
-        if: steps.pr.outputs.created == 'failed'
+      - name: Fail on a sync pull request whose checks failed
+        if: steps.pr.outputs.published == 'failed'
         run: |
           echo "::error::The sync pull request is a draft: its generator check or tests failed."
           exit 1

@@ -52,15 +52,24 @@ node tools/fork/fork.mjs sync <ref>       # print a commit on HEAD whose tree is
 Every day at 03:17 UTC, and on demand from the Actions tab, it fetches upstream's `main`. When that has moved:
 
 - The `build` job verifies `main`, rebuilds the upstream commit with the overlay, and runs the generator check, `bun test tests/`, and the skill script tests on it. It holds no write token, since those checks run upstream's code.
-- The `publish` job takes its code from the commit that started the run, never from `build`'s outputs. It rebuilds the same tree, pushes it to `upstream-sync/<sha>`, and opens a pull request. A sync whose checks passed closes the older sync pull requests and keeps their branches.
+- The `publish` job takes its code from the commit that started the run, never from `build`'s outputs. It rebuilds the same tree, pushes it to `upstream-sync/<first 7 of sha>`, and opens a pull request. When `main`'s overlay has changed since, it updates that pull request instead. A sync whose checks passed closes the older sync pull requests and keeps their branches.
 
-When a check fails, the pull request is a draft and the run that opened it fails. When a patch no longer applies, or `main` has drifted from the overlay, there is no pull request and the run fails every day until it is fixed. GitHub notifies you of a failed run, and its log names the cause. Merge a sync pull request with a merge commit or a squash. `upstreamSha` records the base either way.
+When a check fails, the pull request is a draft and the run that opened or updated it fails. When the failure comes from a patch, fix the patch on `main` (Changing the fork), and the next run updates the draft. When a patch no longer applies, or `main` has drifted from the overlay, there is no pull request and the run fails every day until it is fixed. GitHub notifies you of a failed run, and its log names the cause. Merge a sync pull request with a merge commit or a squash. `upstreamSha` records the base either way.
 
 The jobs use `GITHUB_TOKEN` on purpose. It cannot push a commit that changes a workflow, and nothing it pushes or opens starts a workflow, so no upstream workflow runs with this repository's secrets before you read it. That has three consequences:
 
 - Turn on **Settings > Actions > General > Allow GitHub Actions to create and approve pull requests**, or the job cannot open pull requests.
 - A sync pull request starts no other workflow. Close and reopen it to run `ci.yml` and the `overlay` check on it.
-- A sync in which upstream changed a workflow file fails to push. Read the workflow diff, then push the sync yourself: `git switch -c upstream-sync/<sha> main`, `git merge --ff-only "$(node tools/fork/fork.mjs sync <sha>)"`, and push the branch.
+- A sync in which upstream changed a workflow file fails to push. Read the workflow diff, then push the sync with a credential that has the `workflow` scope, such as your own `gh auth login`:
+
+  ```shell
+  git fetch --no-tags https://github.com/chhoumann/t3-pstack.git main
+  sha=$(git rev-parse FETCH_HEAD)
+  git switch -c "upstream-sync/${sha:0:7}" main
+  git merge --ff-only "$(node tools/fork/fork.mjs sync "$sha")"
+  git push -u origin HEAD
+  gh pr create --base main --fill
+  ```
 
 ### Changing the fork
 
@@ -98,7 +107,7 @@ git commit -am "Redo the fork's patches for upstream <sha>"
 git merge --ff-only "$(node tools/fork/fork.mjs sync <sha> --repair)"
 ```
 
-Push the branch and open a pull request. Its `overlay` check verifies the result against the new `upstreamSha`. The same steps fix a sync draft whose checks failed because of a patch.
+Push the branch and open a pull request. Its `overlay` check verifies the result against the new `upstreamSha`.
 
 ## Known limits
 

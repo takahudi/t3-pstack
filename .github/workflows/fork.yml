@@ -142,7 +142,7 @@ jobs:
           branch="upstream-sync/${sha:0:7}"
           # The newest pull request from this branch stands unless main's overlay
           # has changed its tree since. A closed one with the same tree was declined.
-          number= state= draft=
+          number='' state='' draft=''
           existing=$(gh pr list --head "$branch" --state all --json number,state,isDraft,headRefOid \
             --jq 'first // empty | "\(.number) \(.state) \(.isDraft) \(.headRefOid)"')
           if [ -n "$existing" ]; then
